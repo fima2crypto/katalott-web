@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { inter } from "./ui/fonts";
 
-import "./globals.css";
+import "./ui/globals.css";
 
 export const metadata: Metadata = {
   title: "Katalot App",

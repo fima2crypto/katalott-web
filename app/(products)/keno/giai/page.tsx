@@ -1,9 +1,7 @@
-"use client";
-
-import { useRouter, useSearchParams } from "next/navigation";
-import React, { useCallback, useEffect, useState } from "react";
-
-const API_BASE = "http://localhost:8000";
+import React from "react";
+import Link from "next/link";
+import { fetchGiaiList } from "@/app/lib/kenokq/giai_data";
+import KenoFilter from "@/app/(products)/keno/ui/KenoFilter";
 
 const BACS = [
   "b10",
@@ -43,21 +41,29 @@ const TRUNGS = [
   "T00",
 ];
 
-// ==================== HELPERS ====================
-function fmtDate(dateStr) {
+function fmtDate(dateStr: string) {
   if (!dateStr) return "";
-  const d = (dateStr || "").slice(0, 10);
-  const [y, m, dd] = d.split("-");
-  return `${dd}/${m}/${y}`;
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
-function fmtMoney(val: number) {
+function fmtMoney(val: number | null) {
   if (!val) return "";
   return val.toLocaleString("vi-VN");
 }
 
-// ==================== COMPONENTS ====================
-function Th({ children, className = "", colSpan = undefined }) {
+function Th({
+  children,
+  className = "",
+  colSpan,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  colSpan?: number;
+}) {
   return (
     <th
       colSpan={colSpan}
@@ -68,7 +74,13 @@ function Th({ children, className = "", colSpan = undefined }) {
   );
 }
 
-function Td({ children, className = "" }) {
+function Td({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <td
       className={`px-1 py-0.5 text-center text-xs border border-gray-200 ${className}`}
@@ -78,20 +90,23 @@ function Td({ children, className = "" }) {
   );
 }
 
-function ZZCell({ ky, bac, trung, zz }) {
+function ZZCell({
+  bac,
+  trung,
+  zz,
+}: {
+  bac: string;
+  trung: string;
+  zz: number;
+}) {
   const bacNum = parseInt(bac.slice(1));
   const trungNum = parseInt(trung.slice(1));
   const isMatch = bacNum === trungNum;
-
-  let bg = "";
-  if (isMatch) {
-    bg = bac === "b05" ? "bg-orange-400" : "bg-yellow-300";
-  }
-
+  const bg = isMatch ? (bac === "b05" ? "bg-orange-400" : "bg-yellow-300") : "";
   return <Td className={bg}>{zz > 0 ? zz : ""}</Td>;
 }
 
-function BttRow({ ky_data }) {
+function BttRow({ ky_data }: { ky_data: any }) {
   return (
     <tr className="bg-green-400 font-bold text-xs">
       <Td className="whitespace-nowrap bg-green-400">
@@ -108,94 +123,88 @@ function BttRow({ ky_data }) {
   );
 }
 
-function TrungRows({ ky_data }) {
-  return TRUNGS.map((trung) => {
-    const hasData = BACS.some(
-      (bac) => (ky_data.bacs[bac]?.trungs?.[trung] ?? 0) > 0,
-    );
-    if (!hasData) return null;
-
-    return (
-      <tr key={`${ky_data.ky}-${trung}`} className="hover:bg-blue-50">
-        <Td></Td>
-        <Td></Td>
-        <Td className="text-gray-500 text-xs">{trung}</Td>
-        {BACS.map((bac) => {
-          const zz = ky_data.bacs[bac]?.trungs?.[trung] ?? 0;
-          return (
-            <ZZCell
-              key={`${ky_data.ky}-${trung}-${bac}`}
-              ky={ky_data.ky}
-              bac={bac}
-              trung={trung}
-              zz={zz}
-            />
-          );
-        })}
-      </tr>
-    );
-  });
+function TrungRows({ ky_data }: { ky_data: any }) {
+  return (
+    <>
+      {TRUNGS.map((trung) => {
+        const hasData = BACS.some(
+          (bac) => (ky_data.bacs[bac]?.trungs?.[trung] ?? 0) > 0,
+        );
+        if (!hasData) return null;
+        return (
+          <tr key={`${ky_data.ky}-${trung}`} className="hover:bg-blue-50">
+            <Td></Td>
+            <Td></Td>
+            <Td className="text-gray-500 text-xs">{trung}</Td>
+            {BACS.map((bac) => {
+              const zz = ky_data.bacs[bac]?.trungs?.[trung] ?? 0;
+              return (
+                <ZZCell
+                  key={`${ky_data.ky}-${trung}-${bac}`}
+                  bac={bac}
+                  trung={trung}
+                  zz={zz}
+                />
+              );
+            })}
+          </tr>
+        );
+      })}
+    </>
+  );
 }
 
-// ==================== MAIN ====================
-export default function GiaiPage() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export default async function GiaiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    mode?: string;
+    tu_ngay?: string;
+    den_ngay?: string;
+    limit?: string;
+  }>;
+}) {
+  const sp = await searchParams;
+  const mode = sp.mode || "limit";
+  const limit = parseInt(sp.limit || "20");
+  const today = new Date().toISOString().slice(0, 10);
+  const tu_ngay = sp.tu_ngay || today;
+  const den_ngay = sp.den_ngay || today;
 
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const limit = Number(searchParams.get("limit") || 20);
-
-  function updateLimit(newLimit) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("limit", String(newLimit));
-    router.push(`?${params.toString()}`);
-  }
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ limit });
-      const res = await fetch(`${API_BASE}/keno/giai?${params}`);
-      if (!res.ok) throw new Error(`Lỗi ${res.status}`);
-      const json = await res.json();
-      setData(json.data || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [limit]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const data = await fetchGiaiList(
+    mode === "range" ? { tu_ngay, den_ngay } : { limit },
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 font-mono">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4">
-        <h1 className="text-lg font-bold text-blue-800">🏆 Giải Thưởng Keno</h1>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Số kỳ:</label>
-          <input
-            type="number"
-            min={1}
-            max={500}
-            value={limit}
-            onChange={(e) => updateLimit(Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
-          />
-        </div>
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-wrap">
+        <Link
+          href="/keno"
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </Link>
+        <h1 className="text-lg font-bold text-blue-800">🏆 Giải thưởng</h1>
+        <KenoFilter
+          mode={mode}
+          tuNgay={tu_ngay}
+          denNgay={den_ngay}
+          limit={limit}
+        />
       </div>
-
-      {error && (
-        <div className="m-4 p-3 bg-red-100 text-red-700 rounded text-sm">
-          ⚠️ {error}
-        </div>
-      )}
 
       <div className="overflow-auto">
         <table
@@ -220,13 +229,7 @@ export default function GiaiPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={100} className="text-center py-8 text-gray-400">
-                  ⏳ Đang tải...
-                </td>
-              </tr>
-            ) : data.length === 0 ? (
+            {data.length === 0 ? (
               <tr>
                 <td colSpan={100} className="text-center py-8 text-gray-400">
                   Không có dữ liệu

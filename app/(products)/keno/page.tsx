@@ -1,52 +1,39 @@
-"use client";
+import Link from "next/link";
+import { fetchKenoKqList } from "@/app/lib/kenokq/data";
+import KenoKqTable from "@/app/(products)/keno/ui/KenoKqTable";
+import { KenoKqRow } from "@/app/lib/kenokq/kenokq_definitions";
 
-import GiaiDialog from "@/app/(products)/keno/ui/GiaiDialog";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+// ==================== HELPERS ====================
+function fmtDate(dateStr: string) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
-const API_BASE = "http://localhost:8000";
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
-const BACS = [
-  "b10",
-  "b09",
-  "b08",
-  "b07",
-  "b06",
-  "b05",
-  "b04",
-  "b03",
-  "b02",
-  "b01",
-];
-const BAC_LABELS = [
-  "B10",
-  "B09",
-  "B08",
-  "B07",
-  "B06",
-  "B05",
-  "B04",
-  "B03",
-  "B02",
-  "B01",
-];
-const TRUNGS = [
-  "T10",
-  "T09",
-  "T08",
-  "T07",
-  "T06",
-  "T05",
-  "T04",
-  "T03",
-  "T02",
-  "T01",
-  "T00",
-];
+function parseDateInput(ddmmyyyy: string): string {
+  if (!ddmmyyyy) return "";
+  const parts = ddmmyyyy.split("/");
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+  }
+  return "";
+}
 
-// ==================== MÀU SẮC ====================
-function getNumColor(n) {
-  if (n === 0) return "";
+// ==================== COMPONENTS ====================
+function NumCell({ n }: { n: number }) {
+  if (!n)
+    return (
+      <span className="w-6 h-6 inline-flex items-center justify-center text-xs text-gray-300">
+        -
+      </span>
+    );
   const dec = Math.floor(n / 10);
   const colors = [
     "bg-orange-400",
@@ -59,41 +46,39 @@ function getNumColor(n) {
     "bg-sky-400",
     "bg-red-400",
   ];
-  return colors[dec] || "bg-gray-100";
+  const bg = n === 80 ? "" : colors[dec] || "bg-gray-100";
+  const style = n === 80 ? { backgroundColor: "#ef4444", color: "white" } : {};
+  return (
+    <span
+      className={`w-6 h-6 inline-flex items-center justify-center text-xs rounded font-sans ${bg}`}
+      style={style}
+    >
+      {String(n).padStart(2, "0")}
+    </span>
+  );
 }
 
-function getNumBgStyle(n) {
-  if (n === 80) return { backgroundColor: "#ef4444", color: "white" };
-  return {};
+function CountCell({ val, bgHeader }: { val: number; bgHeader: string }) {
+  const bg = val === 0 ? "bg-gray-200" : val >= 5 ? "bg-red-500" : bgHeader;
+  const color = val === 0 ? "text-gray-400" : "text-black";
+  return (
+    <td
+      className={`px-1 py-0.5 text-center text-xs border border-gray-200 ${bg}`}
+    >
+      <span className={color}>{val}</span>
+    </td>
+  );
 }
 
-function getCountColor(val) {
-  if (val === 0) return "text-gray-300";
-  return "text-black";
-}
-
-function getCellBg(val, highlight = false, bgHeader = "") {
-  if (!highlight) return "";
-  if (val === 0) return "bg-gray-200";
-  if (val >= 5) return "bg-red-500";
-  if (val >= 1) return bgHeader;
-  return "";
-}
-
-function fmtDate(dateStr) {
-  if (!dateStr) return "";
-  const d = (dateStr || "").slice(0, 10);
-  const [y, m, dd] = d.split("-");
-  return `${dd}/${m}/${y}`;
-}
-
-function fmtMoney(val) {
-  if (!val) return "";
-  return val.toLocaleString("vi-VN");
-}
-
-// ==================== COMPONENTS ====================
-function Th({ children, className = "", colSpan = undefined }) {
+function Th({
+  children,
+  className = "",
+  colSpan,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  colSpan?: number;
+}) {
   return (
     <th
       colSpan={colSpan}
@@ -104,11 +89,15 @@ function Th({ children, className = "", colSpan = undefined }) {
   );
 }
 
-// FIX: thêm onClick prop
-function Td({ children, className = "", onClick = undefined }) {
+function Td({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <td
-      onClick={onClick}
       className={`px-1 py-0.5 text-center text-xs border border-gray-200 ${className}`}
     >
       {children}
@@ -116,25 +105,12 @@ function Td({ children, className = "", onClick = undefined }) {
   );
 }
 
-function NumCell({ n }) {
-  if (!n)
-    return (
-      <span className="w-6 h-6 inline-flex items-center justify-center text-xs text-gray-300">
-        -
-      </span>
-    );
-  const base =
-    "w-6 h-6 inline-flex items-center justify-center text-xs rounded font-sans";
-  return (
-    <span className={`${base} ${getNumColor(n)}`} style={getNumBgStyle(n)}>
-      {String(n).padStart(2, "0")}
-    </span>
-  );
-}
-
-// ==================== ROW ====================
-function KenoRow({ row, idx, onKyClick }) {
-  const nums = row.nums || [];
+function KenoRow({ row, idx }: { row: KenoKqRow; idx: number }) {
+  const kyColor = row.jackpot_red
+    ? "bg-red-500 text-white"
+    : row.jackpot_green
+      ? "bg-green-500 text-white"
+      : "text-blue-700";
 
   return (
     <tr className="hover:bg-blue-50 transition-colors">
@@ -142,23 +118,10 @@ function KenoRow({ row, idx, onKyClick }) {
       <Td className="whitespace-nowrap">
         {fmtDate(row.ngay)} {row.gio}
       </Td>
+      <Td className={`font-mono font-bold ${kyColor}`}>{row.ky}</Td>
 
-      {/* Ky — click để mở dialog */}
-      <Td
-        className={`font-mono cursor-pointer hover:underline
-          ${
-            row.jackpot_red
-              ? "bg-red-500 text-white"
-              : row.jackpot_green
-                ? "bg-green-500 text-white"
-                : "text-blue-700 hover:text-blue-900"
-          }`}
-        onClick={() => onKyClick(row.ky)}
-      >
-        {row.ky}
-      </Td>
-
-      {nums.map((n, i) => (
+      {/* 20 so */}
+      {row.nums.map((n, i) => (
         <Td key={i} className="p-0.5">
           <NumCell n={n} />
         </Td>
@@ -167,7 +130,7 @@ function KenoRow({ row, idx, onKyClick }) {
       {/* G0 */}
       <Td>{row.g0_count > 0 ? row.g0.join(",") : ""}</Td>
       <Td
-        className={`${row.g0_count >= 7 ? "bg-red-500 text-white" : row.g0_count >= 5 ? "bg-green-500 text-white" : "bg-yellow-50"} w-8 min-w-[2rem] text-center font-bold`}
+        className={`font-bold w-8 min-w-[2rem] ${row.g0_count >= 7 ? "bg-red-500 text-white" : row.g0_count >= 5 ? "bg-green-500 text-white" : "bg-yellow-50"}`}
       >
         {row.g0_count}
       </Td>
@@ -175,7 +138,7 @@ function KenoRow({ row, idx, onKyClick }) {
       {/* XX */}
       <Td>{row.xx_count > 0 ? row.xx.join(",") : ""}</Td>
       <Td
-        className={`${row.xx_count >= 4 ? "bg-red-500 text-white" : row.xx_count === 0 ? "bg-gray-500" : "bg-yellow-50"} w-8 min-w-[2rem] text-center`}
+        className={`w-8 min-w-[2rem] ${row.xx_count >= 4 ? "bg-red-500 text-white" : row.xx_count === 0 ? "bg-gray-400 text-white" : "bg-yellow-50"}`}
       >
         {row.xx_count}
       </Td>
@@ -183,193 +146,122 @@ function KenoRow({ row, idx, onKyClick }) {
       {/* SNT */}
       <Td>{row.snt_count > 0 ? row.snt.join(",") : ""}</Td>
       <Td
-        className={`${row.snt_count >= 7 ? "bg-red-500 text-white" : row.snt_count >= 5 ? "bg-green-500 text-white" : "bg-yellow-50"} w-8 min-w-[2rem] text-center font-bold`}
+        className={`font-bold w-8 min-w-[2rem] ${row.snt_count >= 7 ? "bg-red-500 text-white" : row.snt_count >= 5 ? "bg-green-500 text-white" : "bg-yellow-50"}`}
       >
         {row.snt_count}
       </Td>
 
       {/* HT0-HT7 */}
-      {Array.from({ length: 8 }).map((_, i) => {
-        const val = row[`ht${i}`] ?? 0;
-        return (
-          <Td key={`ht${i}`} className={getCellBg(val, true, "bg-cyan-100")}>
-            <span className={getCountColor(val)}>{val}</span>
-          </Td>
-        );
-      })}
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <CountCell
+          key={`ht${i}`}
+          val={row[`ht${i}` as keyof KenoKqRow] as number}
+          bgHeader="bg-cyan-100"
+        />
+      ))}
 
       {/* VT */}
-      {[1, 2, 3, 5, 7, 9].map((n) => {
-        const val = row[`vt${n}`] ?? 0;
-        return (
-          <Td key={`vt${n}`} className={getCellBg(val, true, "bg-yellow-100")}>
-            <span className={getCountColor(val)}>{val}</span>
-          </Td>
-        );
-      })}
+      {[1, 2, 3, 5, 7, 9].map((i) => (
+        <CountCell
+          key={`vt${i}`}
+          val={row[`vt${i}` as keyof KenoKqRow] as number}
+          bgHeader="bg-yellow-100"
+        />
+      ))}
 
       {/* H0-H8 */}
-      {Array.from({ length: 9 }).map((_, i) => {
-        const val = row[`h${i}`] ?? 0;
-        return (
-          <Td key={`h${i}`} className={getCellBg(val, true, "bg-blue-100")}>
-            <span className={getCountColor(val)}>{val}</span>
-          </Td>
-        );
-      })}
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <CountCell
+          key={`h${i}`}
+          val={row[`h${i}` as keyof KenoKqRow] as number}
+          bgHeader="bg-blue-100"
+        />
+      ))}
 
       {/* V0-V9 */}
-      {Array.from({ length: 10 }).map((_, i) => {
-        const val = row[`v${i}`] ?? 0;
-        return (
-          <Td key={`v${i}`} className={getCellBg(val, true, "bg-green-100")}>
-            <span className={getCountColor(val)}>{val}</span>
-          </Td>
-        );
-      })}
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+        <CountCell
+          key={`v${i}`}
+          val={row[`v${i}` as keyof KenoKqRow] as number}
+          bgHeader="bg-green-100"
+        />
+      ))}
     </tr>
   );
 }
 
-// ==================== MAIN COMPONENT ====================
-export default function KenoTable() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedKy, setSelectedKy] = useState(null);
+// ==================== FILTER FORM ====================
+import KenoFilter from "@/app/(products)/keno/ui/KenoFilter";
 
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const limit = Number(searchParams.get("limit") || 12);
+// ==================== MAIN ====================
+export default async function KenoKqPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    mode?: string;
+    tu_ngay?: string;
+    den_ngay?: string;
+    limit?: string;
+  }>;
+}) {
+  const sp = await searchParams;
+  const mode = sp.mode || "limit";
+  const limit = parseInt(sp.limit || "20");
 
-  function updateLimit(newLimit) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("limit", String(newLimit));
-    router.push(`?${params.toString()}`);
-  }
+  const today = todayISO();
+  const tu_ngay = sp.tu_ngay || today;
+  const den_ngay = sp.den_ngay || today;
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ limit });
-      const res = await fetch(`${API_BASE}/keno/last?${params}`);
-      if (!res.ok) throw new Error(`Loi ${res.status}`);
-      const json = await res.json();
-      setData(json.data || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [limit]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const data = await fetchKenoKqList(
+    mode === "range" ? { tu_ngay, den_ngay } : { limit },
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 font-mono">
-      {/* Dialog */}
-      {selectedKy && (
-        <GiaiDialog ky={selectedKy} onClose={() => setSelectedKy(null)} />
-      )}
-
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-wrap">
+        <Link href="/" className="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </Link>
         <h1 className="text-lg font-bold text-blue-800">📋 Kết quả</h1>
-        <div className="flex items-center gap-2">
-          <label className="text-sm">So ky:</label>
-          <input
-            type="number"
-            min={1}
-            max={500}
-            value={limit}
-            onChange={(e) => updateLimit(Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
-          />
+        <KenoFilter
+          mode={mode}
+          tuNgay={tu_ngay}
+          denNgay={den_ngay}
+          limit={limit}
+        />
+        <div className="flex items-center gap-2 ml-auto">
+          <Link
+            href="/keno/jackpot"
+            className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium transition-colors"
+          >
+            🎯 Jackpot
+          </Link>
+          <Link
+            href="/keno/giai"
+            className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium transition-colors"
+          >
+            🏆 Giải thưởng
+          </Link>
+          <Link
+            href="/keno/snt"
+            className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium transition-colors"
+          >
+            🔢 SNT
+          </Link>
+          <Link
+            href="/keno/trx"
+            className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-medium transition-colors"
+          >
+            🎟 DS Vé
+          </Link>
         </div>
       </div>
-
-      {error && (
-        <div className="m-4 p-3 bg-red-100 text-red-700 rounded text-sm">
-          {error}
-        </div>
-      )}
 
       {/* Table */}
-      <div className="overflow-auto">
-        <table
-          className="border-collapse text-xs"
-          style={{ minWidth: "max-content" }}
-        >
-          <thead className="sticky top-0 z-10">
-            <tr>
-              <Th className="bg-gray-100">STT</Th>
-              <Th className="bg-gray-100">Ngay</Th>
-              <Th className="bg-gray-100">Ky</Th>
-              {Array.from({ length: 20 }).map((_, i) => (
-                <Th key={i} className="bg-blue-50">
-                  N{i + 1}
-                </Th>
-              ))}
-              <Th colSpan={2} className="bg-red-200">
-                G0
-              </Th>
-              <Th colSpan={2} className="bg-blue-400">
-                XX
-              </Th>
-              <Th colSpan={2} className="bg-green-200">
-                SNT
-              </Th>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Th key={i} className="bg-cyan-200">
-                  HT{i}
-                </Th>
-              ))}
-              {[1, 2, 3, 5, 7, 9].map((n) => (
-                <Th key={n} className="bg-yellow-200">
-                  VT{n}
-                </Th>
-              ))}
-              {Array.from({ length: 9 }).map((_, i) => (
-                <Th key={i} className="bg-blue-200">
-                  H{i}
-                </Th>
-              ))}
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Th key={i} className="bg-green-200">
-                  V{i}
-                </Th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={100} className="text-center py-8 text-gray-400">
-                  Dang tai...
-                </td>
-              </tr>
-            ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={100} className="text-center py-8 text-gray-400">
-                  Khong co du lieu
-                </td>
-              </tr>
-            ) : (
-              data.map((row, i) => (
-                <KenoRow
-                  key={row.ky || i}
-                  idx={i + 1}
-                  row={row}
-                  onKyClick={setSelectedKy}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <KenoKqTable data={data} />
     </div>
   );
 }

@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const API_BASE = "http://localhost:8000";
-
 const BACS = [
   "b10",
   "b09",
@@ -42,19 +40,29 @@ const TRUNGS = [
   "T00",
 ];
 
-function fmtDate(dateStr) {
+function fmtDate(dateStr: string) {
   if (!dateStr) return "";
-  const d = (dateStr || "").slice(0, 10);
-  const [y, m, dd] = d.split("-");
-  return `${dd}/${m}/${y}`;
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
-function fmtMoney(val) {
+function fmtMoney(val: number | null) {
   if (!val) return "";
   return val.toLocaleString("vi-VN");
 }
 
-function Th({ children, className = "", colSpan = undefined }) {
+function Th({
+  children,
+  className = "",
+  colSpan = undefined,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  colSpan?: number;
+}) {
   return (
     <th
       colSpan={colSpan}
@@ -65,7 +73,13 @@ function Th({ children, className = "", colSpan = undefined }) {
   );
 }
 
-function Td({ children, className = "" }) {
+function Td({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <td
       className={`px-1 py-0.5 text-center text-xs border border-gray-200 ${className}`}
@@ -75,7 +89,15 @@ function Td({ children, className = "" }) {
   );
 }
 
-function ZZCell({ bac, trung, zz }) {
+function ZZCell({
+  bac,
+  trung,
+  zz,
+}: {
+  bac: string;
+  trung: string;
+  zz: number;
+}) {
   const bacNum = parseInt(bac.slice(1));
   const trungNum = parseInt(trung.slice(1));
   const isMatch = bacNum === trungNum;
@@ -89,20 +111,20 @@ interface GiaiDialogProps {
 }
 
 export default function GiaiDialog({ ky, onClose }: GiaiDialogProps) {
-  const [giai, setGiai] = useState(null);
+  const [giai, setGiai] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchGiai() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_BASE}/keno/giai/${ky}`);
+        const res = await fetch(`/api/keno/giai/${ky}`);
         if (!res.ok) throw new Error(`Lỗi ${res.status}`);
         const json = await res.json();
         setGiai(json);
-      } catch (e) {
+      } catch (e: any) {
         setError(e.message);
       } finally {
         setLoading(false);
@@ -112,17 +134,14 @@ export default function GiaiDialog({ ky, onClose }: GiaiDialogProps) {
   }, [ky]);
 
   return (
-    // Backdrop
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
       onClick={onClose}
     >
-      {/* Dialog box */}
       <div
         className="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="bg-blue-800 text-white px-4 py-3 flex items-center justify-between">
           <h2 className="font-bold text-sm">
             🏆 Kỳ {ky}
@@ -140,7 +159,6 @@ export default function GiaiDialog({ ky, onClose }: GiaiDialogProps) {
           </button>
         </div>
 
-        {/* Content */}
         <div className="overflow-auto p-2 max-h-[80vh]">
           {loading && (
             <div className="text-center py-8 text-gray-400">⏳ Đang tải...</div>
