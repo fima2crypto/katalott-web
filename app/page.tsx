@@ -381,6 +381,42 @@ export function Sidebar() {
           active={is("/dashboard")}
         />
 
+        <NavItem
+          href="/p655"
+          icon={<IconPower />}
+          label="Power 6/55"
+          collapsed={collapsed}
+          active={is("/p655")}
+        />
+        <NavItem
+          href="/mega"
+          icon={<IconMega />}
+          label="Mega 6/45"
+          collapsed={collapsed}
+          active={is("/mega")}
+        />
+        <NavItem
+          href="/l535"
+          icon={<Icon3DC />}
+          label="Lottt 5/35"
+          collapsed={collapsed}
+          active={is("/l535")}
+        />
+        <NavItem
+          href="/m3dc"
+          icon={<Icon3DC />}
+          label="3D+  "
+          collapsed={collapsed}
+          active={is("/m3dc")}
+        />
+        <NavItem
+          href="/m3dp"
+          icon={<Icon3DP />}
+          label="3D Pro"
+          collapsed={collapsed}
+          active={is("/m3dp")}
+        />
+
         <NavGroup
           icon={<IconKeno />}
           label="Keno"
@@ -409,35 +445,6 @@ export function Sidebar() {
             active={is("/keno/trx")}
           />
         </NavGroup>
-
-        <NavItem
-          href="/p655"
-          icon={<IconPower />}
-          label="Power 6/55"
-          collapsed={collapsed}
-          active={is("/p655")}
-        />
-        <NavItem
-          href="/mega"
-          icon={<IconMega />}
-          label="Mega 6/45"
-          collapsed={collapsed}
-          active={is("/mega")}
-        />
-        <NavItem
-          href="/m3dc"
-          icon={<Icon3DC />}
-          label="3D+  "
-          collapsed={collapsed}
-          active={is("/m3dc")}
-        />
-        <NavItem
-          href="/m3dp"
-          icon={<Icon3DP />}
-          label="3D Pro"
-          collapsed={collapsed}
-          active={is("/m3dp")}
-        />
 
         {/* Functions */}
         <SectionLabel label="Chức năng" collapsed={collapsed} />

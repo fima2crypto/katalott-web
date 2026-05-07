@@ -1,5 +1,12 @@
 import sql from '@/app/lib/db';
-import { P655Kq, P655Row } from './definitions';
+import { P655Kq, P655Row, MegaMatch } from './definitions';
+
+interface MegaKq {
+  ngay: string | null;
+  ky: string | null;
+  n1: string | null; n2: string | null; n3: string | null;
+  n4: string | null; n5: string | null; n6: string | null;
+}
 
 const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53]);
 const ALL_NUMS = Array.from({ length: 55 }, (_, i) => i + 1);
@@ -137,9 +144,22 @@ function computeStats(n16: number[], prevN16: number[]) {
   return { dec0,dec1,dec2,dec3,dec4,dec5, dd, sc, cam, snt, snt_cnt, xx, ke, t1, g0, p1, mod, sum };
 }
 
+// Mega: tim ky mega lien truoc ngay Power, so sanh N16
+function computeMega(pwNgay: string, pwN16: number[], megaRows: MegaKq[]): MegaMatch {
+  const pwDate = new Date(pwNgay).getTime();
+  // Tim ky mega moi nhat co ngay < ngay Power
+  const prev = megaRows.find(r => r.ngay && new Date(r.ngay).getTime() < pwDate);
+  if (!prev) return { ky:null, ngay:null, mn1:0, mn2:0, mn3:0, mn4:0, mn5:0, mn6:0, trung:[] };
+  const mn1=parseNum(prev.n1), mn2=parseNum(prev.n2), mn3=parseNum(prev.n3);
+  const mn4=parseNum(prev.n4), mn5=parseNum(prev.n5), mn6=parseNum(prev.n6);
+  const megaN16 = new Set([mn1,mn2,mn3,mn4,mn5,mn6]);
+  const trung = pwN16.filter(n => megaN16.has(n)).sort((a,b)=>a-b);
+  return { ky: prev.ky?.trim()??null, ngay: String(prev.ngay), mn1, mn2, mn3, mn4, mn5, mn6, trung };
+}
+
 function rowToP655Row(
   row: P655Kq, prevN16: number[], allRows: P655Kq[], idx: number, qhKy: number,
-  levelCache: string[], clCache: string[]
+  levelCache: string[], clCache: string[], megaRows: MegaKq[]
 ): P655Row {
   const n1=parseNum(row.n1), n2=parseNum(row.n2), n3=parseNum(row.n3);
   const n4=parseNum(row.n4), n5=parseNum(row.n5), n6=parseNum(row.n6);
@@ -161,6 +181,7 @@ function rowToP655Row(
   const cl6_cnt = computePatternCnt(cl6, clCache, idx);
 
   const jpmatch = computeJPMatch(n16, allRows, idx);
+  const mega = computeMega(String(row.ngay ?? ''), n16, megaRows);
 
   return {
     thu: row.thu?.trim() ?? '', ngay: String(row.ngay ?? ''), ky: row.ky?.trim() ?? '',
@@ -171,6 +192,7 @@ function rowToP655Row(
     level, level_cnt,
     cl6, cl6_cnt,
     jpm_info: jpmatch.info, jpm_cnt: jpmatch.cnt,
+    mega,
   };
 }
 
@@ -181,10 +203,11 @@ export async function fetchP655List(params: {
 }): Promise<P655Row[]> {
   const { tu_ngay, den_ngay, tu_ky, den_ky, limit = 20, qh_ky = 20 } = params;
 
-  // Fetch FULL history (dung chung cho JPP, QHL, JPMatch, Level, 6CL)
-  const allRows = await sql<P655Kq[]>`
-    SELECT * FROM public.p655kq ORDER BY ky DESC
-  `;
+  // Fetch FULL history + Mega rows
+  const [allRows, megaRows] = await Promise.all([
+    sql<P655Kq[]>`SELECT * FROM public.p655kq ORDER BY ky DESC`,
+    sql<MegaKq[]>`SELECT ngay,ky,n1,n2,n3,n4,n5,n6 FROM public.m645kq ORDER BY ngay DESC`,
+  ]);
 
   // Xac dinh display range
   let displayRows: P655Kq[];
@@ -224,7 +247,7 @@ export async function fetchP655List(params: {
       ? [parseNum(prevRow.n1),parseNum(prevRow.n2),parseNum(prevRow.n3),
          parseNum(prevRow.n4),parseNum(prevRow.n5),parseNum(prevRow.n6)]
       : [];
-    result.push(rowToP655Row(displayRows[i], prevN16, allRows, globalIdx, qh_ky, levelCache, clCache));
+    result.push(rowToP655Row(displayRows[i], prevN16, allRows, globalIdx, qh_ky, levelCache, clCache, megaRows));
   }
   return result;
 }

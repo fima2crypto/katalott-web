@@ -41,4 +41,15 @@ export interface P655Row {
   // JPMatch
   jpm_info: string;       // "535 (00805: 3-9-21-22-26-35)"
   jpm_cnt: number;        // so luong so trung
+  // Mega match
+  mega: MegaMatch;
+}
+
+// Mega match
+export interface MegaMatch {
+  ky: string | null;      // null = MIS
+  ngay: string | null;
+  mn1: number; mn2: number; mn3: number;
+  mn4: number; mn5: number; mn6: number;
+  trung: number[];        // so trung voi N16 Power
 }

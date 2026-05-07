@@ -73,6 +73,20 @@ function P655RowComp({ row, idx, qhKy }: { row: P655Row; idx: number; qhKy: numb
 
   return (
     <tr className="hover:bg-blue-50 transition-colors">
+      {/* Mega: Trung + N1-N6 */}
+      {row.mega.ky === null
+        ? <Td className="bg-gray-200 text-gray-400 text-xs">MIS</Td>
+        : <Td className={row.mega.trung.length === 0 ? "bg-gray-200 text-gray-400" : "text-red-600 font-semibold"}>
+            {row.mega.trung.length > 0 ? row.mega.trung.join(",") : ""}
+          </Td>
+      }
+      {row.mega.ky === null
+        ? <><Td className="bg-gray-200"/><Td className="bg-gray-200"/><Td className="bg-gray-200"/><Td className="bg-gray-200"/><Td className="bg-gray-200"/><Td className="bg-gray-200"/></>
+        : <>{[row.mega.mn1,row.mega.mn2,row.mega.mn3,row.mega.mn4,row.mega.mn5,row.mega.mn6].map((n,i)=>(
+            <Td key={i} className="p-0.5"><NumCell n={n}/></Td>
+          ))}</>
+      }
+
       <Td className="bg-gray-50 text-gray-500">{idx}</Td>
       <Td className={`font-semibold ${THU_COLORS[row.thu] ?? ""}`}>{row.thu}</Td>
       <Td className={`whitespace-nowrap ${ngayBg}`}>{fmtDate(row.ngay)}</Td>
@@ -130,6 +144,7 @@ export default function P655Table({ data, qhKy = 20 }: { data: P655Row[]; qhKy?:
       <table className="border-collapse text-xs w-full min-w-max">
         <thead className="sticky top-0 z-10">
           <tr className="bg-gray-100">
+            <Th colSpan={7} className="bg-blue-200">Mega</Th>
             <Th className="bg-gray-200">#</Th>
             <Th className="bg-gray-200">Thứ</Th>
             <Th className="bg-gray-200">Ngày</Th>
