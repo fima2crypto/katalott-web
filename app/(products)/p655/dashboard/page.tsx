@@ -13,10 +13,9 @@ function numBg(n:number){ return DEC_COLORS[Math.floor(n/10)]??'bg-gray-200 text
 function fmtDate(d:string){ if(!d)return''; const dt=new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; }
 function NumBadge({n,extraBg}:{n:number;extraBg?:string}){
   if(!n) return <span className="w-7 h-6 inline-flex items-center justify-center text-xs text-gray-300">-</span>;
-  return <span className={`w-7 h-6 inline-flex items-center justify-center text-xs rounded font-bold ${extraBg??numBg(n)}`}>{String(n).padStart(2,'00')}</span>;
+  return <span className={`w-7 h-6 inline-flex items-center justify-center text-xs rounded font-bold ${extraBg??numBg(n)}`}>{String(n).padStart(2,'0')}</span>;
 }
 
-// ==================== L2 ====================
 function L2BangSo({latest}:{latest:P655Latest}){
   const n16Set=new Set([latest.n1,latest.n2,latest.n3,latest.n4,latest.n5,latest.n6]);
   const qhlSet=new Set(latest.qhl);
@@ -47,7 +46,6 @@ function L2BangSo({latest}:{latest:P655Latest}){
   );
 }
 
-// ==================== L3 ====================
 function L3T1G0P1({latest}:{latest:P655Latest}){
   const prev=[latest.prevN1,latest.prevN2,latest.prevN3,latest.prevN4,latest.prevN5,latest.prevN6];
   const rows=[
@@ -80,7 +78,6 @@ function L3T1G0P1({latest}:{latest:P655Latest}){
   );
 }
 
-// ==================== L6 SoSEQ ====================
 const DEC_SEQ: Record<number,string> = {
   0:'bg-red-400 text-white',1:'bg-orange-400 text-white',
   2:'bg-yellow-400 text-black',3:'bg-green-500 text-white',
@@ -103,10 +100,10 @@ function computeSoSEQ(rows:P655Row[]):{lech:number;nums:number[]}[]{
 function L6SoSEQ({allData,qhKy=20}:{allData:P655Row[];qhKy?:number}){
   const entries=computeSoSEQ(allData);
   return (
-    <div className="flex-shrink-0 bg-yellow-50 border border-yellow-300 rounded p-2 overflow-y-auto" style={{maxHeight:'80vh'}}>
+    <div className="flex-shrink-0 bg-yellow-50 border border-yellow-300 rounded p-2">
       <div className="text-xs font-bold text-yellow-800 mb-1">L6 - SoSEQ</div>
       <table className="border-collapse text-xs">
-        <thead className="sticky top-0"><tr className="bg-gray-100">
+        <thead><tr className="bg-gray-100">
           <th className="px-2 py-1 text-center font-semibold border border-gray-300 bg-gray-200">Lệch</th>
           <th className="px-2 py-1 text-center font-semibold border border-gray-300 bg-gray-200">Số</th>
         </tr></thead>
@@ -131,7 +128,6 @@ function L6SoSEQ({allData,qhKy=20}:{allData:P655Row[];qhKy?:number}){
   );
 }
 
-// ==================== MAIN ====================
 export default async function P655DashboardPage() {
   const [lastJP, latest, allData] = await Promise.all([
     fetchLastJP(),
@@ -158,23 +154,25 @@ export default async function P655DashboardPage() {
         )}
       </div>
 
-      {/* Row 1: L3 + L2 */}
-      {latest && (
-        <div className="p-3 flex gap-2 items-start">
-          <L3T1G0P1 latest={latest}/>
-          <L2BangSo latest={latest}/>
-        </div>
-      )}
+      <div className="p-3 flex gap-3 items-start">
 
-      {/* Row 2: L6 ngang hang L7 */}
-      <div className="p-3 pt-0 flex gap-3 items-start overflow-x-auto">
-        <L6SoSEQ allData={allData} qhKy={20}/>
-        <DashboardRight
-          lastJP={lastJP}
-          jpDd={jpDd}
-          kqData={kqData}
-          qhKy={20}
-        />
+        {/* COT TRAI: L3 / L2 / L6 */}
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          {latest && <L3T1G0P1 latest={latest}/>}
+          {latest && <L2BangSo latest={latest}/>}
+          <L6SoSEQ allData={allData} qhKy={20}/>
+        </div>
+
+        {/* COT PHAI: DashboardRight gom L14/L5/L7 */}
+        <div className="flex-1 overflow-x-auto">
+          <DashboardRight
+            lastJP={lastJP}
+            jpDd={jpDd}
+            kqData={kqData}
+            qhKy={20}
+          />
+        </div>
+
       </div>
     </div>
   );
