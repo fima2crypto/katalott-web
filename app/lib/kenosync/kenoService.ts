@@ -6,7 +6,7 @@
 
 import { Pool } from "pg";
 import * as cheerio from "cheerio";
-import { KenoRecord, LogEntry, SyncOptions, SyncResult } from "@/types/keno";
+import { KenoRecord, LogEntry, SyncOptions, SyncResult } from "./keno";
 import { addAbortSignal } from "stream";
 
 // ── Constants ────────────────────────────────────────────────────────────────

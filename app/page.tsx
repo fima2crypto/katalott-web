@@ -470,6 +470,13 @@ export function Sidebar() {
           collapsed={collapsed}
           active={is("/keno/sync")}
         />
+        <NavItem
+          href="/vuaxs/"
+          icon={<IconSync />}
+          label="Vua Xo So"
+          collapsed={collapsed}
+          active={is("/vuaxs/")}
+        />
       </nav>
 
       {/* Collapse button */}

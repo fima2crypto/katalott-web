@@ -2,7 +2,7 @@
 // app/keno/sync/page.tsx
 
 import { useState, useRef, useCallback } from "react";
-import { LogEntry, SyncResult } from "@/types/keno";
+import { LogEntry, SyncResult } from "@/app/lib/kenosync/keno";
 
 // ── Types for stream events ───────────────────────────────────────────────────
 type StreamEvent =

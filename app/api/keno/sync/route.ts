@@ -12,7 +12,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { syncMissing } from "@/lib/kenoService";
+import { syncMissing } from "@/app/lib/kenosync/kenoService";
 import { LogEntry, SyncOptions } from "@/types/keno";
 
 export const runtime = "nodejs"; // needs Node APIs (pg, fetch)
