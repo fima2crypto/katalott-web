@@ -17,13 +17,7 @@ const TABS: { label: string; value: StatusFilter }[] = [
   { label: 'Đã huỷ', value: '3' },
 ]
 
-export default function FilterBar({
-  filter,
-  onFilterChange,
-  gameFilter,
-  onGameFilterChange,
-  games,
-}: Props) {
+export default function FilterBar({ filter, onFilterChange, gameFilter, onGameFilterChange, games }: Props) {
   return (
     <div className="mb-4 space-y-2">
       <div className="flex gap-1 bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
@@ -41,7 +35,6 @@ export default function FilterBar({
           </button>
         ))}
       </div>
-
       {games.length > 0 && (
         <select
           value={gameFilter}

@@ -1,9 +1,8 @@
-import { ApiResponse, GroupHistory, ParsedGameName, StatusFilter } from './types'
+import { ApiResponse, GroupDetail, GroupHistory, ParsedGameName, StatusFilter } from './types'
 
 export const ACCOUNT_ID = '84966020709'
 export const PAGE_SIZE = 20
 
-// Parse date string "19/05/2026 17:00:00" → Date object
 function parseVNDate(str?: string): Date | null {
   if (!str) return null
   const [datePart, timePart] = str.split(' ')
@@ -24,37 +23,34 @@ export function formatDate(str?: string): string {
   return d.toLocaleDateString('vi-VN')
 }
 
-export function groupByDate(
-  items: GroupHistory[]
-): Record<string, GroupHistory[]> {
-  return items.reduce(
-    (acc, item) => {
-      const key = formatDate(item.timeCutOff || item.createTime)
-      if (!acc[key]) acc[key] = []
-      acc[key].push(item)
-      return acc
-    },
-    {} as Record<string, GroupHistory[]>
-  )
+export function formatUpdatedAt(isoStr?: string | null): string {
+  if (!isoStr) return 'Chưa có dữ liệu'
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
 }
 
-export function getStatusLabel(status: number): {
-  label: string
-  color: string
-} {
+export function groupByDate(items: GroupHistory[]): Record<string, GroupHistory[]> {
+  return items.reduce((acc, item) => {
+    const key = formatDate(item.timeCutOff || item.createTime)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {} as Record<string, GroupHistory[]>)
+}
+
+export function getStatusLabel(status: number): { label: string; color: string } {
   switch (status) {
-    case 1:
-      return { label: 'Đang mở', color: 'blue' }
-    case 2:
-      return { label: 'Hoàn thành', color: 'green' }
-    case 3:
-      return { label: 'Đã huỷ', color: 'red' }
-    default:
-      return { label: 'Không rõ', color: 'gray' }
+    case 1: return { label: 'Đang mở', color: 'blue' }
+    case 2: return { label: 'Hoàn thành', color: 'green' }
+    case 3: return { label: 'Đã huỷ', color: 'red' }
+    default: return { label: 'Không rõ', color: 'gray' }
   }
 }
 
-// Parse "Power 6/55 - Bao 8 - 146044" → { game: "Power 6/55", type: "Bao 8" }
 export function parseGameName(name: string): ParsedGameName {
   const parts = name.split(' - ')
   return {
@@ -68,11 +64,12 @@ export function getStatusParam(filter: StatusFilter): string {
   return filter
 }
 
+// Fetch từ API vuaxoso (online)
 export async function fetchHistoryGroup(
   token: string,
   filter: StatusFilter,
   page: number
-): Promise<{ items: GroupHistory[]; total: number }> {
+): Promise<{ items: GroupHistory[]; total: number; lastUpdated: null }> {
   const params = new URLSearchParams({
     accountId: ACCOUNT_ID,
     status: getStatusParam(filter),
@@ -80,77 +77,96 @@ export async function fetchHistoryGroup(
     pageSize: String(PAGE_SIZE),
   })
 
-  const res = await fetch(`/api/vuaxs?${params}`, {
-    headers: {
-      'X-Access-Token': token,
-      Accept: 'application/json',
-    },
+  const res = await fetch(`/api/vuaxs/history?${params}`, {
+    headers: { 'X-Access-Token': token, Accept: 'application/json' },
   })
 
-  const data: ApiResponse & { error?: string; body?: string } =
-    await res.json()
-
+  const data: ApiResponse & { error?: string } = await res.json()
   if (!res.ok || data.result !== 0) {
-    throw new Error(
-      data.error || data.resultDesc || `HTTP ${res.status}`
-    )
+    throw new Error(data.error || data.resultDesc || `HTTP ${res.status}`)
   }
 
-  const items = data.data || []
-  const total = data.total || data.totalElements || items.length
+  return {
+    items: (data.data as GroupHistory[]) || [],
+    total: data.total || data.totalElements || 0,
+    lastUpdated: null,
+  }
+}
 
-  return { items, total }
+// Fetch từ DB (offline fallback)
+export async function fetchHistoryFromDB(
+  page: number
+): Promise<{ items: GroupHistory[]; total: number; lastUpdated: string | null }> {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(PAGE_SIZE),
+  })
+
+  const res = await fetch(`/api/vuaxs/groups?${params}`)
+  const data = await res.json()
+
+  if (!res.ok || data.error) throw new Error(data.error || 'Lỗi load DB')
+
+  return {
+    items: data.data || [],
+    total: data.total || 0,
+    lastUpdated: data.lastUpdated ?? null,
+  }
+}
+
+// Fetch detail từ API vuaxoso (online)
+export async function fetchGroupDetail(
+  token: string,
+  groupId: number
+): Promise<GroupDetail> {
+  const params = new URLSearchParams({
+    accountId: ACCOUNT_ID,
+    groupId: String(groupId),
+  })
+
+  const res = await fetch(`/api/vuaxs/history-detail?${params}`, {
+    headers: { 'X-Access-Token': token, Accept: 'application/json' },
+  })
+
+  const json: ApiResponse & { error?: string } = await res.json()
+  if (!res.ok || json.result !== 0) {
+    throw new Error(json.error || json.resultDesc || `HTTP ${res.status}`)
+  }
+
+  return json.data as GroupDetail
+}
+
+// Fetch detail từ DB (offline fallback)
+export async function fetchGroupDetailFromDB(groupId: number): Promise<GroupDetail> {
+  const res = await fetch(`/api/vuaxs/groups/${groupId}`)
+  const json = await res.json()
+
+  if (!res.ok || json.error) throw new Error(json.error || 'Không tìm thấy trong DB')
+
+  return json.data as GroupDetail
 }
 
 export function exportToCSV(items: GroupHistory[]): void {
   const headers = [
-    'ID',
-    'Tên nhóm',
-    'Game',
-    'Loại bao',
-    'Trạng thái',
-    'Kỳ quay',
-    'Ngày mở thưởng',
-    'Thành viên',
-    'Số vé',
-    'Tiến độ (%)',
-    'Góp (%)',
-    'Số tiền góp (đ)',
-    'Thời gian đóng',
-    'Ngày tạo',
-    'Thắng/Thua',
-    'Giải thưởng (đ)',
+    'ID', 'Tên nhóm', 'Game', 'Loại bao', 'Trạng thái',
+    'Kỳ quay', 'Ngày mở thưởng', 'Thành viên', 'Số vé',
+    'Tiến độ (%)', 'Góp (%)', 'Số tiền góp (đ)',
+    'Thời gian đóng', 'Ngày tạo', 'Giải thưởng (đ)',
   ]
-
-  const rows = items.map((item) => {
+  const rows = items.map(item => {
     const { game, type } = parseGameName(item.name)
     const { label } = getStatusLabel(item.groupStatus)
-    const winLabel =
-      item.statusWin === 1 ? 'Thắng' : item.statusWin === 0 ? 'Thua' : '—'
     return [
-      item.id,
-      item.name,
-      game,
-      type,
-      label,
-      item.drawInfo.drawId,
-      item.drawInfo.openDate,
-      item.numberOfMembers,
-      item.numberOfTickets,
-      item.procress,
-      item.percentageOfShares,
-      item.moneyOfShares,
-      item.timeCutOff,
-      item.createTime,
-      winLabel,
-      item.prizeWinAfterTax,
+      item.id, item.name, game, type, label,
+      item.drawInfo.drawId, item.drawInfo.openDate,
+      item.numberOfMembers, item.numberOfTickets,
+      item.procress, item.percentageOfShares, item.moneyOfShares,
+      item.timeCutOff, item.createTime, item.prizeWinAfterTax,
     ]
   })
-
   const csv = [headers, ...rows]
-    .map((row) => row.map((cell) => `"${cell}"`).join(','))
+    .map(row => row.map(cell => `"${cell}"`).join(','))
     .join('\n')
-
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
